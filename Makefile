@@ -33,7 +33,7 @@ NATIVE_LIBS=-cclib libs/extc/extc_stubs.o -cclib -lz -cclib libs/objsize/c_objsi
 RELDIR=../../..
 
 MODULES=ast type lexer common genxml parser typecore optimizer typeload \
-codegen gencommon genas3 gencpp genjs genneko genphp genswf8 \
+codegen gencommon genas3 gencpp genjs gents genneko genphp genswf8 \
 	genswf9 genswf genjava gencs interp dce filters typer matcher version main
 
 ADD_REVISION=0
@@ -123,6 +123,8 @@ genjava.cmx: type.cmx gencommon.cmx common.cmx codegen.cmx ast.cmx
 
 genjs.cmx: type.cmx optimizer.cmx lexer.cmx common.cmx codegen.cmx ast.cmx
 
+gents.cmx: type.cmx optimizer.cmx lexer.cmx common.cmx codegen.cmx ast.cmx
+
 genneko.cmx: type.cmx lexer.cmx common.cmx codegen.cmx ast.cmx
 
 genphp.cmx: type.cmx lexer.cmx common.cmx codegen.cmx ast.cmx
@@ -139,7 +141,7 @@ interp.cmx: typecore.cmx type.cmx lexer.cmx genneko.cmx common.cmx codegen.cmx a
 
 matcher.cmx: optimizer.cmx codegen.cmx typecore.cmx type.cmx typer.cmx common.cmx ast.cmx
 
-main.cmx: filters.cmx matcher.cmx typer.cmx typeload.cmx typecore.cmx type.cmx parser.cmx optimizer.cmx lexer.cmx interp.cmx genxml.cmx genswf.cmx genphp.cmx genneko.cmx genjs.cmx gencpp.cmx genas3.cmx common.cmx codegen.cmx ast.cmx gencommon.cmx genjava.cmx gencs.cmx version.cmx
+main.cmx: filters.cmx matcher.cmx typer.cmx typeload.cmx typecore.cmx type.cmx parser.cmx optimizer.cmx lexer.cmx interp.cmx genxml.cmx genswf.cmx genphp.cmx genneko.cmx genjs.cmx gents.cmx gencpp.cmx genas3.cmx common.cmx codegen.cmx ast.cmx gencommon.cmx genjava.cmx gencs.cmx version.cmx
 
 optimizer.cmx: typecore.cmx type.cmx parser.cmx common.cmx ast.cmx
 
@@ -152,7 +154,7 @@ typecore.cmx: type.cmx common.cmx ast.cmx
 
 typeload.cmx: typecore.cmx type.cmx parser.cmx optimizer.cmx lexer.cmx common.cmx ast.cmx
 
-typer.cmx: typeload.cmx typecore.cmx type.cmx parser.cmx optimizer.cmx lexer.cmx interp.cmx genneko.cmx genjs.cmx common.cmx codegen.cmx ast.cmx filters.cmx
+typer.cmx: typeload.cmx typecore.cmx type.cmx parser.cmx optimizer.cmx lexer.cmx interp.cmx genneko.cmx genjs.cmx gents.cmx common.cmx codegen.cmx ast.cmx filters.cmx
 
 lexer.cmx: lexer.ml
 

@@ -2594,7 +2594,8 @@ let resolve_module_file com m remap p =
 		let file = Common.unique_full_path file in
 		if List.exists (fun path -> ExtString.String.starts_with file (try Common.unique_full_path path with _ -> path)) com.std_path then raise Not_found;
 	| _ -> ());
-	if !forbid then begin
+	(** We don't want this check because we want to rely on the JS stdlib for the TS target. *)
+	(* if !forbid then begin
 		let _, decls = (!parse_hook) com file p in
 		let meta = (match decls with
 		| (EClass d,_) :: _ -> d.d_meta
@@ -2607,7 +2608,7 @@ let resolve_module_file com m remap p =
 			let x = (match fst m with [] -> assert false | x :: _ -> x) in
 			raise (Forbid_package ((x,m,p),[],if Common.defined com Define.Macro then "macro" else platform_name com.platform));
 		end;
-	end;
+	end; *)
 	file
 
 let parse_module ctx m p =
