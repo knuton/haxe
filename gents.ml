@@ -968,24 +968,8 @@ let generate_class ctx c =
 	| [],"Function" -> error "This class redefine a native one" c.cl_pos
 	| _ -> ());
 	let p = s_path ctx c.cl_path in
-	let hxClasses = has_feature ctx "Type.resolveClass" in
-	if ctx.js_flatten then
-		print ctx "var "
-	else
-		generate_package_create ctx c.cl_path;
-	if ctx.js_modern || not hxClasses then
-		print ctx "%s = " p
-	else
-		print ctx "%s = $hxClasses[\"%s\"] = " p (dot_path c.cl_path);
-	(match (get_exposed ctx p c.cl_meta) with [s] -> print ctx "$hx_exports.%s = " s | _ -> ());
-	(match c.cl_constructor with
-	| Some { cf_expr = Some e } -> gen_expr ctx e
-	| _ -> (print ctx "function() { }"); ctx.separator <- true);
+	print ctx "class %s {}" p;
 	newline ctx;
-	if ctx.js_modern && hxClasses then begin
-		print ctx "$hxClasses[\"%s\"] = %s" (dot_path c.cl_path) p;
-		newline ctx;
-	end;
 	generate_class___name__ ctx c;
 	(match c.cl_implements with
 	| [] -> ()
@@ -1317,4 +1301,3 @@ let generate com =
 	output_string ch (Buffer.contents ctx.buf);
 	close_out ch);
 	t()
-
