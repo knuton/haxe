@@ -33,7 +33,7 @@ NATIVE_LIBS=-cclib libs/extc/extc_stubs.o -cclib -lz -cclib libs/objsize/c_objsi
 RELDIR=../../..
 
 MODULES=ast type lexer common genxml parser typecore optimizer typeload \
-codegen gencommon genas3 gencpp genjs gents genneko genphp genswf8 \
+json codegen gencommon genas3 gencpp genjs gents genneko genphp genswf8 \
 	genswf9 genswf genjava gencs interp dce filters typer matcher version main
 
 ADD_REVISION=0
@@ -148,7 +148,7 @@ optimizer.cmx: typecore.cmx type.cmx parser.cmx common.cmx ast.cmx
 parser.cmx: parser.ml lexer.cmx common.cmx ast.cmx
 	$(CC_PARSER_CMD)
 
-type.cmx: ast.cmx
+type.cmx: ast.cmx json.cmx
 
 typecore.cmx: type.cmx common.cmx ast.cmx
 

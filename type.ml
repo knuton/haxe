@@ -21,6 +21,7 @@
  *)
 
 open Ast
+open Json
 
 type path = string list * string
 
@@ -1838,3 +1839,397 @@ let rec s_expr_pretty tabs s_type e =
 		sprintf "cast (%s,%s)" (loop e) (s_type_path (t_path mt))
 	| TMeta ((n,el,_),e) ->
 		sprintf "@%s%s %s" (Meta.to_string n) (match el with [] -> "" | _ -> "(" ^ (String.concat ", " (List.map Ast.s_expr el)) ^ ")") (loop e)
+
+
+(* ==== JSON Serialization ==== *)
+
+(* Types *)
+
+let tabstract_ident tabstract = Json.JsonString (s_type_path tabstract.a_path)
+let tclass_ident tclass = Json.JsonString (s_type_path tclass.cl_path)
+let tdef_ident tdef = Json.JsonString (s_type_path tdef.t_path)
+let tenum_ident tenum = Json.JsonString (s_type_path tenum.e_path)
+let mt_ident mt = Json.JsonString (s_type_path (t_path mt))
+
+let rec t_ident t = match t with
+	| TMono m ->
+		begin match !m with
+			| Some t' -> t_ident t'
+			| None -> Json.JsonNull
+		end
+	| TEnum(tenum, tparams) ->
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TEnum");
+			("tenum", tenum_ident tenum);
+			("tparams", Json.JsonList (List.map t_ident tparams))
+		]
+	| TInst(tclass, tparams) ->
+		tinst_ident tclass tparams
+	| TType(tdef, tparams) ->
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TType");
+			("tdef", tdef_ident tdef);
+			("tparams", Json.JsonList (List.map t_ident tparams))
+		]
+	| TFun(param_ts, result_t) ->
+		let ty_triple_to_json (s, b, t) = Json.JsonList [Json.JsonString s; Json.JsonBool b; t_ident t] in
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TFun");
+			("params", Json.JsonList (List.map ty_triple_to_json param_ts));
+			("result", t_ident result_t)
+		]
+	| TAnon tanon ->
+		let field_desc field = (field.cf_name, t_ident field.cf_type) in
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TAnon");
+			("fields", Json.JsonAssoc (PMap.foldi (fun _ field acc -> field_desc field :: acc) tanon.a_fields []))
+		]
+	| TDynamic t ->
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TDynamic");
+			("type", t_ident t)
+		]
+	| TLazy rt ->
+		t_ident (!rt())
+	| TAbstract(tabstract, tparams) ->
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TAbstract");
+			("tabstract", tabstract_ident tabstract);
+			("tparams", Json.JsonList (List.map t_ident tparams))
+		]
+
+and tinst_ident tclass tparams =
+	 Json.JsonAssoc [
+		("node_kind", Json.JsonString "TInst");
+		("tclass", tclass_ident tclass);
+		("tparams", Json.JsonList (List.map t_ident tparams))
+	]
+
+let field_kind_to_json field_kind =
+	(* TODO There are more cases, see s_kind *)
+	Json.JsonString (match field_kind with
+		| Var _ -> "variable"
+		| Method _ -> "method")
+
+(* Expressions *)
+
+let tconstant_to_json = function
+	| TInt i ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TInt");
+			("const_value", Json.JsonInt (Int32.to_int i))
+		]
+	| TFloat s ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TFloat");
+			("const_value", Json.JsonString s)
+		]
+	| TString s ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TString");
+			("const_value", Json.JsonString s)
+		]
+	| TBool b ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TBool");
+			("const_value", Json.JsonBool b)
+		]
+	| TNull ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TNull");
+			("const_value", Json.JsonNull)
+		]
+	| TThis ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TThis");
+			("const_value", Json.JsonNull)
+		]
+	| TSuper ->
+		Json.JsonAssoc [
+			("const_kind", Json.JsonString "TSuper");
+			("const_value", Json.JsonNull)
+		]
+
+
+let rec texpr_to_json e =
+	let sprintf = Printf.sprintf in
+	let s_var v = v.v_name in
+	let recur = texpr_to_json in
+	let slist f l = String.concat "," (List.map f l) in
+	match e.eexpr with
+		| TConst c ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("const", tconstant_to_json c)
+			]
+		| TLocal v ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("name", Json.JsonString (s_var v))
+			]
+		| TArray (e1,e2) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("array", recur e1);
+				("accessor", recur e2)
+			]
+		| TBinop (op,e1,e2) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("op", Json.JsonString (s_binop op));
+				("left", recur e1);
+				("right", recur e2)
+			]
+		| TEnumParameter (e1,_,i) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("value", recur e1);
+				("index", Json.JsonInt i)
+			]
+		| TField (e,f) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("expression", recur e)
+			]
+			(* TODO
+			let fstr = (match f with
+				| FStatic (c,f) -> "static(" ^ s_type_path c.cl_path ^ "." ^ f.cf_name ^ ")"
+				| FInstance (c,f) -> "inst(" ^ s_type_path c.cl_path ^ "." ^ f.cf_name ^ " : " ^ s_type f.cf_type ^ ")"
+				| FClosure (c,f) -> "closure(" ^ (match c with None -> f.cf_name | Some c -> s_type_path c.cl_path ^ "." ^ f.cf_name)  ^ ")"
+				| FAnon f -> "anon(" ^ f.cf_name ^ ")"
+				| FEnum (en,f) -> "enum(" ^ s_type_path en.e_path ^ "." ^ f.ef_name ^ ")"
+				| FDynamic f -> "dynamic(" ^ f ^ ")"
+			) in
+			sprintf "%s.%s" (loop e) fstr
+			*)
+		| TTypeExpr m ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("type", Json.JsonString (s_type_path (t_path m)))
+			]
+			(* TODO
+			sprintf "TypeExpr %s" (s_type_path (t_path m))
+			*)
+		| TParenthesis e ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("expression", recur e)
+			]
+		| TObjectDecl fl ->
+			let obj_pair (f, e) =
+				Json.JsonAssoc [
+					("name", Json.JsonString f);
+					("expression", recur e)
+				]
+			in
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("fields", Json.JsonList (List.map obj_pair fl))
+			]
+		| TArrayDecl el ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("members", Json.JsonList (List.map recur el))
+			]
+		| TCall (e,el) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("callee", recur e);
+				("params", Json.JsonList (List.map recur el))
+			]
+		| TNew (c,pl,el) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("tclass", tclass_ident c);
+				("tparams", Json.JsonList (List.map t_ident pl));
+				("params", Json.JsonList (List.map recur el))
+			]
+		| TUnop (op,f,e) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("op", Json.JsonString (s_unop op));
+				("position", Json.JsonString (if f == Prefix then "prefix" else "postfix"));
+				("operand", recur e)
+			]
+		| TFunction f ->
+			let param_to_json (var, default) =
+				Json.JsonAssoc [
+					("name", Json.JsonString (s_var var));
+					("type", t_ident var.v_type);
+					("default", Option.map_default tconstant_to_json Json.JsonNull default)
+				]
+			in
+			let params = Json.JsonList (List.map param_to_json f.tf_args) in
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("params", params);
+				("body", recur f.tf_expr)
+			]
+		| TVar (v,eo) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("name", Json.JsonString (s_var v));
+				("type", t_ident v.v_type);
+				("value", Option.map_default recur Json.JsonNull eo)
+			]
+		| TBlock el ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("statements", Json.JsonList (List.map recur el))
+			]
+		| TFor (v,econd,e) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("variable", Json.JsonString (s_var v));
+				("type", t_ident v.v_type);
+				("iteree", recur econd);
+				("body", recur e)
+			]
+		| TIf (e,e1,e2) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("condition", recur e);
+				("then", recur e1);
+				("else", Option.map_default recur Json.JsonNull e2)
+			]
+		| TWhile (econd,e,flag) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("condition", recur econd);
+				("body", recur e);
+				("inverted", Json.JsonBool (if flag = NormalWhile then false else true))
+			]
+		| TSwitch (e,cases,def) ->
+			let case_to_json (cl, e) =
+				Json.JsonAssoc [
+					("patterns", Json.JsonList (List.map recur cl));
+					("body", recur e)
+				]
+			in
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("expression", recur e);
+				("cases", Json.JsonList (List.map case_to_json cases));
+				("default", Option.map_default recur Json.JsonNull def)
+			]
+		| TPatMatch dt ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("TODO", Json.JsonString (s_dt "" (dt.dt_dt_lookup.(dt.dt_first))))
+			]
+		| TTry (e,cl) ->
+			let clause (v, e) =
+				Json.JsonAssoc [
+					("variable", Json.JsonString (s_var v));
+					("type", t_ident v.v_type);
+					("body", recur e)
+				]
+			in
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("try", recur e);
+				("clauses", Json.JsonList (List.map clause cl))
+			]
+		| TReturn eo ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("value", Option.map_default recur Json.JsonNull eo)
+			]
+		| TBreak ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+			]
+		| TContinue ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+			]
+		| TThrow e ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("value", recur e);
+			]
+		| TCast (e,t) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("type", Option.map_default mt_ident Json.JsonNull t);
+				("expression", recur e)
+			]
+		| TMeta ((n,el,_),e) ->
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString (s_expr_kind e));
+				("TODO", Json.JsonString (sprintf "@%s%s" (Meta.to_string n) (match el with [] -> "" | _ -> "(" ^ (String.concat ", " (List.map Ast.s_expr el)) ^ ")")));
+				("expression", (recur e))
+			]
+
+(* Top Level *)
+
+let module_to_json mt =
+	(* Built in the image of Codegen.dump_types *)
+	(*
+	let s_type = s_type (Type.print_context()) in
+	let params = function [] -> "" | l -> Printf.sprintf "<%s>" (String.concat "," (List.map (fun (n,t) -> n ^ " : " ^ s_type t) l)) in
+	let s_expr = try if Common.defined_value com Define.Dump = "pretty" then Type.s_expr_pretty "\t" else Type.s_expr with Not_found -> Type.s_expr in
+	List.iter (fun mt ->
+	*)
+	(* We build JSON directly *)
+	let path = t_path mt in
+	match mt with
+	| TClassDecl c ->
+		let param_to_json (name, ty) =
+			Json.JsonAssoc [
+				("name", Json.JsonString name);
+				("type", t_ident ty)
+			]
+		in
+		let rec field_to_json stat f =
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString "ClassField");
+				("name", Json.JsonString f.cf_name);
+				("public", Json.JsonBool f.cf_public);
+				("static", Json.JsonBool stat);
+				("field_kind", field_kind_to_json f.cf_kind);
+				("field_type", t_ident f.cf_type);
+				("params", Json.JsonList (List.map param_to_json f.cf_params));
+				("body", Option.map_default texpr_to_json Json.JsonNull f.cf_expr)
+			]
+			(*
+			(match f.cf_expr with
+			| None -> ()
+			| Some e -> print "\n\n\t = %s" (s_expr s_type e));
+			*)
+		in
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "ClassDecl");
+			("path", tclass_ident c);
+			("private", Json.JsonBool c.cl_private);
+			("interface", Json.JsonBool c.cl_interface);
+			("types", Json.JsonList (List.map (fun (s, t) -> t_ident t) c.cl_types));
+			("super", Option.map_default (fun (tclass,tparams) -> tinst_ident tclass tparams) Json.JsonNull c.cl_super);
+			("implements", Json.JsonList (List.map (fun (tclass,tparams) -> tinst_ident tclass tparams) c.cl_implements));
+			("fields", Json.JsonList (List.map (field_to_json false) c.cl_ordered_fields));
+			("statics", Json.JsonList (List.map (field_to_json true) c.cl_ordered_statics));
+			("constructor", Option.map_default (field_to_json false) Json.JsonNull c.cl_constructor)
+		]
+		(* TODO
+			mutable cl_init : texpr option;
+		*)
+	| TEnumDecl e ->
+		Json.JsonNull
+		(*
+		print "%s%senum %s%s {\n" (if e.e_private then "private " else "") (if e.e_extern then "extern " else "") (s_type_path path) (params e.e_types);
+		List.iter (fun n ->
+			let f = PMap.find n e.e_constrs in
+			print "\t%s : %s;\n" f.ef_name (s_type f.ef_type);
+		) e.e_names;
+		print "}"
+		*)
+	| TTypeDecl t ->
+		Json.JsonNull
+		(*
+		print "%stype %s%s = %s" (if t.t_private then "private " else "") (s_type_path path) (params t.t_types) (s_type t.t_type);
+		*)
+	| TAbstractDecl a ->
+		Json.JsonNull
+		(*
+		print "%sabstract %s%s {}" (if a.a_private then "private " else "") (s_type_path path) (params a.a_types);
+		*)
