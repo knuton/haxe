@@ -1951,44 +1951,44 @@ let tconstant_to_json = function
 		]
 
 
-let rec texpr_to_json e =
+let rec texpr_to_json texpr =
 	let sprintf = Printf.sprintf in
 	let s_var v = v.v_name in
 	let recur = texpr_to_json in
 	let slist f l = String.concat "," (List.map f l) in
-	match e.eexpr with
+	match texpr.eexpr with
 		| TConst c ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("const", tconstant_to_json c)
 			]
 		| TLocal v ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("name", Json.JsonString (s_var v))
 			]
 		| TArray (e1,e2) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("array", recur e1);
 				("accessor", recur e2)
 			]
 		| TBinop (op,e1,e2) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("op", Json.JsonString (s_binop op));
 				("left", recur e1);
 				("right", recur e2)
 			]
 		| TEnumParameter (e1,_,i) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("value", recur e1);
 				("index", Json.JsonInt i)
 			]
 		| TField (e,f) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("expression", recur e)
 			]
 			(* TODO
@@ -2004,7 +2004,7 @@ let rec texpr_to_json e =
 			*)
 		| TTypeExpr m ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("type", Json.JsonString (s_type_path (t_path m)))
 			]
 			(* TODO
@@ -2012,7 +2012,7 @@ let rec texpr_to_json e =
 			*)
 		| TParenthesis e ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("expression", recur e)
 			]
 		| TObjectDecl fl ->
@@ -2023,30 +2023,30 @@ let rec texpr_to_json e =
 				]
 			in
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("fields", Json.JsonList (List.map obj_pair fl))
 			]
 		| TArrayDecl el ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("members", Json.JsonList (List.map recur el))
 			]
 		| TCall (e,el) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("callee", recur e);
 				("params", Json.JsonList (List.map recur el))
 			]
 		| TNew (c,pl,el) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("tclass", tclass_ident c);
 				("tparams", Json.JsonList (List.map t_ident pl));
 				("params", Json.JsonList (List.map recur el))
 			]
 		| TUnop (op,f,e) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("op", Json.JsonString (s_unop op));
 				("position", Json.JsonString (if f == Prefix then "prefix" else "postfix"));
 				("operand", recur e)
@@ -2061,25 +2061,25 @@ let rec texpr_to_json e =
 			in
 			let params = Json.JsonList (List.map param_to_json f.tf_args) in
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("params", params);
 				("body", recur f.tf_expr)
 			]
 		| TVar (v,eo) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("name", Json.JsonString (s_var v));
 				("type", t_ident v.v_type);
 				("value", Option.map_default recur Json.JsonNull eo)
 			]
 		| TBlock el ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("statements", Json.JsonList (List.map recur el))
 			]
 		| TFor (v,econd,e) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("variable", Json.JsonString (s_var v));
 				("type", t_ident v.v_type);
 				("iteree", recur econd);
@@ -2087,14 +2087,14 @@ let rec texpr_to_json e =
 			]
 		| TIf (e,e1,e2) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("condition", recur e);
 				("then", recur e1);
 				("else", Option.map_default recur Json.JsonNull e2)
 			]
 		| TWhile (econd,e,flag) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("condition", recur econd);
 				("body", recur e);
 				("inverted", Json.JsonBool (if flag = NormalWhile then false else true))
@@ -2107,14 +2107,14 @@ let rec texpr_to_json e =
 				]
 			in
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("expression", recur e);
 				("cases", Json.JsonList (List.map case_to_json cases));
 				("default", Option.map_default recur Json.JsonNull def)
 			]
 		| TPatMatch dt ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("TODO", Json.JsonString (s_dt "" (dt.dt_dt_lookup.(dt.dt_first))))
 			]
 		| TTry (e,cl) ->
@@ -2126,37 +2126,37 @@ let rec texpr_to_json e =
 				]
 			in
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("try", recur e);
 				("clauses", Json.JsonList (List.map clause cl))
 			]
 		| TReturn eo ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("value", Option.map_default recur Json.JsonNull eo)
 			]
 		| TBreak ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 			]
 		| TContinue ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 			]
 		| TThrow e ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("value", recur e);
 			]
 		| TCast (e,t) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("type", Option.map_default mt_ident Json.JsonNull t);
 				("expression", recur e)
 			]
 		| TMeta ((n,el,_),e) ->
 			Json.JsonAssoc [
-				("node_kind", Json.JsonString (s_expr_kind e));
+				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("TODO", Json.JsonString (sprintf "@%s%s" (Meta.to_string n) (match el with [] -> "" | _ -> "(" ^ (String.concat ", " (List.map Ast.s_expr el)) ^ ")")));
 				("expression", (recur e))
 			]
