@@ -1987,9 +1987,49 @@ let rec texpr_to_json texpr =
 				("index", Json.JsonInt i)
 			]
 		| TField (e,f) ->
+			let field_access_flag = function
+				| FStatic (c,f) ->
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Static");
+						("class", tclass_ident c);
+						("name", Json.JsonString f.cf_name)
+					]
+				| FInstance (c,f) ->
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Instance");
+						("class", tclass_ident c);
+						("name", Json.JsonString f.cf_name);
+						("type", t_ident f.cf_type)
+					]
+				| FClosure (c,f) ->
+					let cf_name = (match c with
+						| None -> f.cf_name
+						| Some c -> s_type_path c.cl_path ^ "." ^ f.cf_name) in
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Closure");
+						("name", Json.JsonString cf_name);
+					]
+				| FAnon f ->
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Anon");
+						("name", Json.JsonString f.cf_name);
+					]
+				| FEnum (en,f) ->
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Enum");
+						("enum", tenum_ident en);
+						("name", Json.JsonString f.ef_name)
+					]
+				| FDynamic f ->
+					Json.JsonAssoc [
+						("access_kind", Json.JsonString "Dynamic");
+						("name", Json.JsonString f);
+					]
+			in
 			Json.JsonAssoc [
 				("node_kind", Json.JsonString (s_expr_kind texpr));
-				("expression", recur e)
+				("expression", recur e);
+				("field", field_access_flag f)
 			]
 			(* TODO
 			let fstr = (match f with
