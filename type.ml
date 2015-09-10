@@ -2197,16 +2197,8 @@ let param_to_json (name, ty) =
 
 let module_to_json mt =
 	(* Built in the image of Codegen.dump_types *)
-	(*
-	let s_type = s_type (Type.print_context()) in
-	let params = function [] -> "" | l -> Printf.sprintf "<%s>" (String.concat "," (List.map (fun (n,t) -> n ^ " : " ^ s_type t) l)) in
-	let s_expr = try if Common.defined_value com Define.Dump = "pretty" then Type.s_expr_pretty "\t" else Type.s_expr with Not_found -> Type.s_expr in
-	List.iter (fun mt ->
-	*)
-	(* We build JSON directly *)
 	let path = t_path mt in
-	match mt with
-	| TClassDecl c ->
+	let class_to_json c =
 		let rec field_to_json stat f =
 			Json.JsonAssoc [
 				("node_kind", Json.JsonString "ClassField");
@@ -2239,6 +2231,9 @@ let module_to_json mt =
 		(* TODO
 			mutable cl_init : texpr option;
 		*)
+	match mt with
+	| TClassDecl c ->
+		class_to_json c
 	| TEnumDecl e ->
 		let enum_field_to_json field =
 			Json.JsonAssoc [
@@ -2246,7 +2241,7 @@ let module_to_json mt =
 				("name", Json.JsonString field.ef_name);
 				("params", Json.JsonList (List.map param_to_json field.ef_params));
 				("type", t_ident field.ef_type);
-				("index", Json.JsonInt field.ef_index);
+				("index", Json.JsonInt field.ef_index)
 			]
 		in
 		let fields = List.map (fun n -> enum_field_to_json (PMap.find n e.e_constrs)) e.e_names in
@@ -2258,12 +2253,27 @@ let module_to_json mt =
 			("constructors", Json.JsonList fields)
 		]
 	| TTypeDecl t ->
-		Json.JsonNull
-		(*
-		print "%stype %s%s = %s" (if t.t_private then "private " else "") (s_type_path path) (params t.t_types) (s_type t.t_type);
-		*)
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "TypeDecl");
+			("path", tdef_ident t);
+			("private", Json.JsonBool t.t_private);
+			("type", t_ident t.t_type);
+			("types", Json.JsonList (List.map (fun (s, t) -> t_ident t) t.t_types));
+		]
 	| TAbstractDecl a ->
-		Json.JsonNull
-		(*
-		print "%sabstract %s%s {}" (if a.a_private then "private " else "") (s_type_path path) (params a.a_types);
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "AbstractDecl");
+			("path", tabstract_ident a);
+			("private", Json.JsonBool a.a_private);
+			("underlying", t_ident a.a_this);
+			("types", Json.JsonList (List.map (fun (s, t) -> t_ident t) a.a_types));
+			("impl", Option.map_default class_to_json Json.JsonNull a.a_impl)
+		]
+		(* TODO
+		mutable a_ops : (Ast.binop * tclass_field) list;
+		mutable a_unops : (Ast.unop * unop_flag * tclass_field) list;
+		mutable a_from : (t * tclass_field option) list;
+		mutable a_array : tclass_field list;
+		mutable a_to : (t * tclass_field option) list;
 		*)
+}
