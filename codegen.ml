@@ -1309,6 +1309,16 @@ let dump_types com =
 			print "%sabstract %s%s {}" (if a.a_private then "private " else "") (s_type_path path) (params a.a_types);
 		);
 		close();
+		(* Print class declarations to JSON *)
+		let path = Type.t_path mt in
+		(match mt with 
+			| Type.TClassDecl _ ->
+				let channel = open_out ("dump" ^ "/" ^ Common.platform_name com.platform ^ "/" ^ String.concat "/" (fst path) ^ "/" ^ snd path ^ ".json") in
+				output_string channel (Json.json_to_string (Type.module_to_json mt));
+				close_out channel;
+			| _ ->
+				assert true;
+		);
 	) com.types
 
 let dump_dependencies com =
