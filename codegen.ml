@@ -1312,7 +1312,8 @@ let dump_types com =
 		(* Print class declarations to JSON *)
 		let path = Type.t_path mt in
 		(match mt with 
-			| Type.TClassDecl _ ->
+			| Type.TClassDecl _
+			| Type.TEnumDecl _ ->
 				let channel = open_out ("dump" ^ "/" ^ Common.platform_name com.platform ^ "/" ^ String.concat "/" (fst path) ^ "/" ^ snd path ^ ".json") in
 				output_string channel (Json.json_to_string (Type.module_to_json mt));
 				close_out channel;

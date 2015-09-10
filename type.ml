@@ -2031,25 +2031,11 @@ let rec texpr_to_json texpr =
 				("expression", recur e);
 				("field", field_access_flag f)
 			]
-			(* TODO
-			let fstr = (match f with
-				| FStatic (c,f) -> "static(" ^ s_type_path c.cl_path ^ "." ^ f.cf_name ^ ")"
-				| FInstance (c,f) -> "inst(" ^ s_type_path c.cl_path ^ "." ^ f.cf_name ^ " : " ^ s_type f.cf_type ^ ")"
-				| FClosure (c,f) -> "closure(" ^ (match c with None -> f.cf_name | Some c -> s_type_path c.cl_path ^ "." ^ f.cf_name)  ^ ")"
-				| FAnon f -> "anon(" ^ f.cf_name ^ ")"
-				| FEnum (en,f) -> "enum(" ^ s_type_path en.e_path ^ "." ^ f.ef_name ^ ")"
-				| FDynamic f -> "dynamic(" ^ f ^ ")"
-			) in
-			sprintf "%s.%s" (loop e) fstr
-			*)
 		| TTypeExpr m ->
 			Json.JsonAssoc [
 				("node_kind", Json.JsonString (s_expr_kind texpr));
 				("type", Json.JsonString (s_type_path (t_path m)))
 			]
-			(* TODO
-			sprintf "TypeExpr %s" (s_type_path (t_path m))
-			*)
 		| TParenthesis e ->
 			Json.JsonAssoc [
 				("node_kind", Json.JsonString (s_expr_kind texpr));
@@ -2201,6 +2187,12 @@ let rec texpr_to_json texpr =
 				("expression", (recur e))
 			]
 
+let param_to_json (name, ty) =
+	Json.JsonAssoc [
+		("name", Json.JsonString name);
+		("type", t_ident ty)
+	]
+
 (* Top Level *)
 
 let module_to_json mt =
@@ -2215,12 +2207,6 @@ let module_to_json mt =
 	let path = t_path mt in
 	match mt with
 	| TClassDecl c ->
-		let param_to_json (name, ty) =
-			Json.JsonAssoc [
-				("name", Json.JsonString name);
-				("type", t_ident ty)
-			]
-		in
 		let rec field_to_json stat f =
 			Json.JsonAssoc [
 				("node_kind", Json.JsonString "ClassField");
@@ -2254,15 +2240,23 @@ let module_to_json mt =
 			mutable cl_init : texpr option;
 		*)
 	| TEnumDecl e ->
-		Json.JsonNull
-		(*
-		print "%s%senum %s%s {\n" (if e.e_private then "private " else "") (if e.e_extern then "extern " else "") (s_type_path path) (params e.e_types);
-		List.iter (fun n ->
-			let f = PMap.find n e.e_constrs in
-			print "\t%s : %s;\n" f.ef_name (s_type f.ef_type);
-		) e.e_names;
-		print "}"
-		*)
+		let enum_field_to_json field =
+			Json.JsonAssoc [
+				("node_kind", Json.JsonString "EnumField");
+				("name", Json.JsonString field.ef_name);
+				("params", Json.JsonList (List.map param_to_json field.ef_params));
+				("type", t_ident field.ef_type);
+				("index", Json.JsonInt field.ef_index);
+			]
+		in
+		let fields = List.map (fun n -> enum_field_to_json (PMap.find n e.e_constrs)) e.e_names in
+		Json.JsonAssoc [
+			("node_kind", Json.JsonString "EnumDecl");
+			("path", tenum_ident e);
+			("private", Json.JsonBool e.e_private);
+			("types", Json.JsonList (List.map (fun (s, t) -> t_ident t) e.e_types));
+			("constructors", Json.JsonList fields)
+		]
 	| TTypeDecl t ->
 		Json.JsonNull
 		(*
