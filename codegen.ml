@@ -1324,10 +1324,13 @@ let dump_json com =
 				let print_to_buf = Buffer.add_string buf in
 				let siblingTypes = List.filter
 					(fun ty -> ty != mt && (Type.t_infos ty).mt_module.m_id = (Type.t_infos mt).mt_module.m_id)
-					com.types in
+					com.types
+				in
+				let decl = Serialiser.module_type_to_json mt in
+				let siblings = Json.List (List.map Serialiser.module_type_to_json siblingTypes) in
 				let outer = Json.Assoc [
-					("decl", Serialiser.module_type_to_json mt);
-					("siblings", Json.List (List.map Serialiser.module_type_to_json siblingTypes));
+					("decl", decl);
+					("siblings", siblings);
 					("refs", Json.Assoc (PMap.foldi (fun k v acc -> (string_of_int k, v) :: acc) !Serialiser.gjson []))
 				] in
 				Json.print_to_buffer print_to_buf outer;
