@@ -25,3 +25,36 @@ let rec json_to_string json =
 		"null"
 	| String value ->
 		"\"" ^ String.escaped value ^ "\""
+
+let rec print_to_buffer printer json =
+	let insert_sep pos = if pos = 0 then () else printer ", " in
+	match json with
+	| Assoc pairs ->
+		printer "{ ";
+		List.iteri (fun i (key, value) ->
+			insert_sep i;
+			printer "\"";
+			printer (String.escaped key);
+			printer "\": ";
+			print_to_buffer printer value
+		) pairs;
+		printer " }";
+	| Bool value ->
+		printer (if value then "true" else "false");
+	| Float value ->
+		printer (string_of_float value);
+	| Int value ->
+		printer (string_of_int value);
+	| List values ->
+		printer "[";
+		List.iteri (fun i value ->
+			insert_sep i;
+			print_to_buffer printer value;
+		) values;
+		printer "]";
+	| Null ->
+		printer "null";
+	| String value ->
+		printer "\"";
+		printer (String.escaped value);
+		printer "\"";

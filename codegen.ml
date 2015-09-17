@@ -1252,10 +1252,10 @@ let rec constructor_side_effects e =
 (*
 	Make a dump of the full typed AST of all types
 *)
-let rec create_dumpfile acc = function
+let rec create_dumpfile_with ending acc = function
 	| [] -> assert false
 	| d :: [] ->
-		let ch = open_out (String.concat "/" (List.rev (d :: acc)) ^ ".dump") in
+		let ch = open_out (String.concat "/" (List.rev (d :: acc)) ^ ending) in
 		let buf = Buffer.create 0 in
 		buf, (fun () ->
 			output_string ch (Buffer.contents buf);
@@ -1263,7 +1263,9 @@ let rec create_dumpfile acc = function
 	| d :: l ->
 		let dir = String.concat "/" (List.rev (d :: acc)) in
 		if not (Sys.file_exists dir) then Unix.mkdir dir 0o755;
-		create_dumpfile (d :: acc) l
+		create_dumpfile_with ending (d :: acc) l
+
+let create_dumpfile = create_dumpfile_with ".dump"
 
 let dump_types com =
 	let s_type = s_type (Type.print_context()) in
@@ -1309,19 +1311,24 @@ let dump_types com =
 			print "%sabstract %s%s {}" (if a.a_private then "private " else "") (s_type_path path) (params a.a_types);
 		);
 		close();
+	) com.types
+
+let dump_json com =
+	List.iter (fun mt ->
 		(* Print class declarations to JSON *)
 		let path = Type.t_path mt in
 		(match mt with 
 			| Type.TClassDecl _
 			| Type.TEnumDecl _ ->
-				let channel = open_out ("dump" ^ "/" ^ Common.platform_name com.platform ^ "/" ^ String.concat "/" (fst path) ^ "/" ^ snd path ^ ".json") in
+				let buf,close = create_dumpfile_with ".json" [] ("dump" :: (Common.platform_name com.platform) :: fst path @ [snd path]) in
+				let print_to_buf = Buffer.add_string buf in
 				let decl = Serialiser.module_type_to_json mt in
 				let outer = Json.Assoc [
 					("refs", Json.Assoc (PMap.foldi (fun k v acc -> (string_of_int k, v) :: acc) !Serialiser.gjson []));
 					("decl", decl)
 				] in
-				output_string channel (Json.json_to_string outer);
-				close_out channel;
+				Json.print_to_buffer print_to_buf outer;
+				close();
 			| _ ->
 				assert true;
 		);

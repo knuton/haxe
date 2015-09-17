@@ -1411,6 +1411,7 @@ try
 		if com.platform = Java then List.iter (Codegen.promote_abstract_parameters com) com.types;
 		if com.platform = Flash || com.platform = Cpp then List.iter (Codegen.fix_overrides com) com.types;
 		if Common.defined com Define.Dump then Codegen.dump_types com;
+		if Common.defined com Define.DumpJson then Codegen.dump_json com;
 		if Common.defined com Define.DumpDependencies then Codegen.dump_dependencies com;
 		t();
 		(match com.platform with
