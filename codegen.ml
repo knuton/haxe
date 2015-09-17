@@ -1315,7 +1315,12 @@ let dump_types com =
 			| Type.TClassDecl _
 			| Type.TEnumDecl _ ->
 				let channel = open_out ("dump" ^ "/" ^ Common.platform_name com.platform ^ "/" ^ String.concat "/" (fst path) ^ "/" ^ snd path ^ ".json") in
-				output_string channel (Json.json_to_string (Type.module_to_json mt));
+				let decl = Serialiser.module_type_to_json mt in
+				let outer = Json.Assoc [
+					("refs", Json.Assoc (PMap.foldi (fun k v acc -> (string_of_int k, v) :: acc) !Serialiser.gjson []));
+					("decl", decl)
+				] in
+				output_string channel (Json.json_to_string outer);
 				close_out channel;
 			| _ ->
 				assert true;
