@@ -33,7 +33,7 @@ NATIVE_LIBS=-cclib libs/extc/extc_stubs.o -cclib -lz -cclib libs/objsize/c_objsi
 RELDIR=../../..
 
 MODULES=ast type lexer common genxml parser typecore optimizer typeload \
-	json serialiser codegen gencommon genas3 gencpp genjs gents genneko genphp genswf8 \
+	json serializer codegen gencommon genas3 gencpp genjs gents genneko genphp genswf8 \
 	genswf9 genswf genjava gencs interp dce filters typer matcher version main
 
 ADD_REVISION=0
@@ -103,7 +103,7 @@ install_tools: tools
 uninstall:
 	rm -rf $(INSTALL_BIN_DIR)/haxe $(INSTALL_BIN_DIR)/haxelib $(INSTALL_LIB_DIR)
 
-codegen.cmx: optimizer.cmx typeload.cmx typecore.cmx type.cmx genxml.cmx common.cmx ast.cmx json.cmx serialiser.cmx
+codegen.cmx: optimizer.cmx typeload.cmx typecore.cmx type.cmx genxml.cmx common.cmx ast.cmx json.cmx serializer.cmx
 
 common.cmx: type.cmx ast.cmx
 
