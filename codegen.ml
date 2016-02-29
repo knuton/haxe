@@ -1322,7 +1322,8 @@ let dump_json com =
     if List.exists (fun s -> s = filename) com.args then
       (match mt with 
         | Type.TClassDecl _
-        | Type.TEnumDecl _ ->
+        | Type.TEnumDecl _
+        | Type.TTypeDecl _ ->
           let buf,close = create_dumpfile_with ".json" [] ("dump" :: (Common.platform_name com.platform) :: fst path @ [snd path]) in
           let print_to_buf = Buffer.add_string buf in
           let siblingTypes = List.filter
