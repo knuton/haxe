@@ -1330,8 +1330,8 @@ let dump_json com =
             (fun ty -> ty != mt && (Type.t_infos ty).mt_module.m_id = (Type.t_infos mt).mt_module.m_id)
             com.types
           in
-          let decl = Serializer.module_type_to_json mt in
-          let siblings = Json.List (List.map Serializer.module_type_to_json siblingTypes) in
+          let decl = Serializer.module_type_to_json false mt in
+          let siblings = Json.List (List.map (Serializer.module_type_to_json false) siblingTypes) in
           let outer = Json.Assoc [
             ("decl", decl);
             ("siblings", siblings);
